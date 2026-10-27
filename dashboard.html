@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>AegisVault Terminal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0e0a;
+      color: #00ff66;
+      font-family: "Courier New", Courier, monospace;
+      padding: 16px;
+      line-height: 1.4;
+    }
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+      border: 1px solid #00ff6644;
+      padding: 16px;
+      background: #0d140d;
+      box-shadow: 0 0 15px rgba(0, 255, 102, 0.05);
+    }
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px dashed #00ff6644;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+    }
+    .title-group {
+      display: flex;
+      flex-direction: column;
+    }
+    h1 {
+      font-size: 17px;
+      letter-spacing: 1px;
+    }
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #net-status {
+      font-size: 12px;
+      color: #ffb000;
+    }
+    .mode-btn {
+      background: #050805;
+      color: #00ff66;
+      border: 1px solid #00ff66aa;
+      padding: 5px 10px;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      font-weight: bold;
+      text-transform: uppercase;
+      transition: all 0.15s ease;
+    }
+    .mode-btn:hover {
+      background: #00ff66;
+      color: #0a0e0a;
+    }
+
+    .status-box {
+      border: 1px solid #00ff66;
+      padding: 14px;
+      margin-bottom: 16px;
+      text-align: center;
+      background: #00ff6608;
+      transition: all 0.2s ease;
+    }
+    .state-title { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+    #sys-state { font-size: 24px; font-weight: bold; margin-top: 4px; letter-spacing: 1px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .card {
+      border: 1px solid #00ff6633;
+      padding: 10px 14px;
+      background: #050805;
+    }
+    .card-label { font-size: 11px; color: #777; text-transform: uppercase; }
+    .card-val { font-size: 15px; font-weight: bold; margin-top: 4px; }
+
+    .controls-panel {
+      margin-bottom: 16px;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    button {
+      background: #050805;
+      color: #00ff66;
+      border: 1px solid #00ff66;
+      padding: 10px 16px;
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.15s ease;
+    }
+    button:hover { background: #00ff66; color: #0a0e0a; }
+    button:active { background: #00cc52; }
+
+    /* Biometric Primary Button */
+    .btn-biometric {
+      width: 100%;
+      padding: 16px 20px;
+      font-size: 15px;
+      letter-spacing: 1.5px;
+      border: 2px solid #00ff66;
+      background: #00220d;
+      color: #00ff66;
+      box-shadow: 0 0 10px rgba(0, 255, 102, 0.2);
+    }
+    .btn-biometric:hover {
+      background: #00ff66;
+      color: #0a0e0a;
+      box-shadow: 0 0 15px rgba(0, 255, 102, 0.4);
+    }
+
+    .btn-secondary {
+      border-color: #444;
+      color: #777;
+    }
+    .btn-secondary:hover {
+      background: #333;
+      color: #fff;
+    }
+
+    #log {
+      height: 180px;
+      overflow-y: auto;
+      border: 1px solid #00ff6622;
+      background: #050705;
+      padding: 10px;
+      font-size: 12px;
+    }
+    .log-entry { margin-bottom: 4px; word-break: break-all; }
+    .dim { color: #555; }
+    .alert-red { color: #ff3344 !important; border-color: #ff3344 !important; }
+    .alert-yellow { color: #ffb000 !important; border-color: #ffb000 !important; }
+
+    /* Responsive & Mobile Mode Tweaks */
+    @media (max-width: 600px) {
+      body { padding: 8px; }
+      .container { padding: 12px; }
+      h1 { font-size: 15px; }
+      .grid { grid-template-columns: 1fr; gap: 8px; }
+      .controls { flex-direction: column; }
+      .controls button { width: 100%; }
+      #sys-state { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="title-group">
+      <h1>AEGISVAULT // SYS-TERMINAL</h1>
+      <span class="dim" style="font-size: 11px;">CSE402 LAB &bull; AUTONOMOUS CYBER-PHYSICAL VAULT</span>
+    </div>
+    <div class="header-controls">
+      <button class="mode-btn" id="mode-toggle-btn" onclick="toggleOperationalMode()">[ MODE: DESKTOP ]</button>
+      <div id="net-status">[CONNECTING...]</div>
+    </div>
+  </header>
+
+  <!-- Big Threat State Banner -->
+  <div class="status-box" id="state-banner">
+    <div class="state-title">Finite State Machine State</div>
+    <div id="sys-state">STANDBY / ARMED</div>
+  </div>
+
+  <!-- Telemetry Grid -->
+  <div class="grid">
+    <div class="card">
+      <div class="card-label">Laser Tripwire (LDR - GPIO 34)</div>
+      <div class="card-val" id="val-beam">INTACT</div>
+      <div class="dim" id="val-ldr" style="font-size: 11px; margin-top:2px;">ADC: --</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Motion Sensor (PIR - GPIO 27)</div>
+      <div class="card-val" id="val-pir">CLEAR</div>
+      <div class="dim" style="font-size: 11px; margin-top:2px;">Thermal Volumetric</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Door Deadbolt (Servo - GPIO 18)</div>
+      <div class="card-val" id="val-door">UNLOCKED (0°)</div>
+      <div class="dim" style="font-size: 11px; margin-top:2px;">Containment Lock</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Asset Pedestal (Servo - GPIO 13)</div>
+      <div class="card-val" id="val-pedestal">SURFACE (0°)</div>
+      <div class="dim" id="val-tamper" style="font-size: 11px; margin-top:2px;">Safe Switch: OK</div>
+    </div>
+  </div>
+
+  <!-- Dynamic Controls Panel (Desktop vs Mobile) -->
+  <div class="controls-panel">
+    <div class="card-label" id="controls-label" style="margin-bottom: 6px;">Operator Controls [DESKTOP MODE]</div>
+    
+    <!-- Desktop Controls Container -->
+    <div class="controls" id="desktop-controls">
+      <button onclick="sendCommand('DISARM')">[ DISARM / RESET SYSTEM ]</button>
+      <button class="btn-secondary" onclick="clearLogs()">[ CLEAR LOG ]</button>
+    </div>
+
+    <!-- Mobile Controls Container (Biometric Scan) -->
+    <div class="controls" id="mobile-controls" style="display: none; flex-direction: column;">
+      <button class="btn-biometric" id="btn-biometric" onclick="triggerBiometricDisarm()">
+        [ &#x2318; SCAN FINGERPRINT TO DISARM ]
+      </button>
+      <div style="display: flex; gap: 10px; width: 100%;">
+        <button onclick="sendCommand('DISARM')" style="flex: 1; font-size: 12px; border-color: #ffb000; color: #ffb000;">
+          [ MANUAL OVERRIDE DISARM ]
+        </button>
+        <button class="btn-secondary" onclick="clearLogs()" style="flex: 1; font-size: 12px;">
+          [ CLEAR LOG ]
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Minimal Log Output -->
+  <div class="card-label" style="margin-bottom: 4px;">Telemetry Event Stream</div>
+  <div id="log">
+    <div class="log-entry dim">> Initializing AegisVault terminal...</div>
+  </div>
+</div>
+
+<script>
+  // --- CONFIGURATION ---
+  const BROKER = "broker.hivemq.com";
+  const PORT = 8884;
+  const CLIENT_ID = "VaultTerm-" + Math.floor(Math.random() * 100000);
+  const TOPIC_TELEMETRY = "aegisvault/telemetry";
+  const TOPIC_COMMANDS = "aegisvault/commands";
+
+  let currentMode = "DESKTOP"; // "DESKTOP" or "MOBILE"
+
+  // --- MQTT CLIENT INITIALIZATION ---
+  const client = new Paho.MQTT.Client(BROKER, PORT, CLIENT_ID);
+
+  client.onConnectionLost = (resp) => {
+    document.getElementById("net-status").textContent = "[BROKER DISCONNECTED]";
+    document.getElementById("net-status").style.color = "#ff3344";
+    log("NETWORK", "Connection severed: " + (resp.errorMessage || "Unknown"));
+  };
+
+  client.onMessageArrived = (msg) => {
+    try {
+      const data = JSON.parse(msg.payloadString);
+      updateTelemetry(data);
+      log("EVENT", `${data.state} | LDR:${data.ldr} PIR:${data.pir} Tamper:${data.tamper}`);
+    } catch(e) {
+      log("RAW", msg.payloadString);
+    }
+  };
+
+  client.connect({
+    useSSL: true,
+    timeout: 5,
+    onSuccess: () => {
+      document.getElementById("net-status").textContent = "[WSS: CONNECTED]";
+      document.getElementById("net-status").style.color = "#00ff66";
+      client.subscribe(TOPIC_TELEMETRY);
+      log("INIT", `Connected to HiveMQ WSS. Subscribed to ${TOPIC_TELEMETRY}`);
+    },
+    onFailure: (err) => {
+      document.getElementById("net-status").textContent = "[CONN FAILED]";
+      document.getElementById("net-status").style.color = "#ff3344";
+      log("ERROR", "MQTT Connection Failed: " + (err.errorMessage || JSON.stringify(err)));
+    }
+  });
+
+  // --- TELEMETRY RENDERER ---
+  function updateTelemetry(d) {
+    const banner = document.getElementById("state-banner");
+    const stateEl = document.getElementById("sys-state");
+    const beamEl = document.getElementById("val-beam");
+    const ldrEl = document.getElementById("val-ldr");
+    const pirEl = document.getElementById("val-pir");
+    const doorEl = document.getElementById("val-door");
+    const pedEl = document.getElementById("val-pedestal");
+    const tampEl = document.getElementById("val-tamper");
+
+    // State banner & actuators
+    if (d.state) {
+      stateEl.textContent = d.state;
+      if (d.state === "TIER_1_LOCKDOWN") {
+        banner.className = "status-box alert-yellow";
+        doorEl.textContent = "LOCKED (90°)";
+        doorEl.className = "card-val alert-yellow";
+        pedEl.textContent = "CONCEALED (90°)";
+        pedEl.className = "card-val alert-yellow";
+      } else if (d.state === "TIER_2_CRITICAL_BREACH") {
+        banner.className = "status-box alert-red";
+        doorEl.textContent = "HARD LOCKED (90°)";
+        doorEl.className = "card-val alert-red";
+        pedEl.textContent = "TAMPERED / REMOVED";
+        pedEl.className = "card-val alert-red";
+      } else if (d.state === "SYSTEM_DISARMED") {
+        banner.className = "status-box alert-yellow";
+        doorEl.textContent = "UNLOCKED (0°)";
+        doorEl.className = "card-val";
+        pedEl.textContent = "SURFACE (0°)";
+        pedEl.className = "card-val";
+      } else {
+        banner.className = "status-box";
+        doorEl.textContent = "UNLOCKED (0°)";
+        doorEl.className = "card-val";
+        pedEl.textContent = "SURFACE (0°)";
+        pedEl.className = "card-val";
+      }
+    }
+
+    // Optical beam
+    if (d.ldr !== undefined) {
+      ldrEl.textContent = `ADC: ${d.ldr} (Trip: >${d.threshold || 2500})`;
+      if (d.ldr > (d.threshold || 2500)) {
+        beamEl.textContent = "BEAM BROKEN";
+        beamEl.className = "card-val alert-red";
+      } else {
+        beamEl.textContent = "INTACT";
+        beamEl.className = "card-val";
+      }
+    }
+
+    // PIR motion
+    if (d.pir !== undefined) {
+      if (d.pir === 1) {
+        pirEl.textContent = "MOTION DETECTED";
+        pirEl.className = "card-val alert-red";
+      } else {
+        pirEl.textContent = "CLEAR";
+        pirEl.className = "card-val";
+      }
+    }
+
+    // Tamper limit switch
+    if (d.tamper !== undefined) {
+      tampEl.textContent = d.tamper === 0 ? "Safe Switch: TRIPPED" : "Safe Switch: OK";
+      if (d.tamper === 0) tampEl.className = "dim alert-red";
+      else tampEl.className = "dim";
+    }
+  }
+
+  // --- DISPATCH COMMAND ---
+  function sendCommand(cmd) {
+    if (!client.isConnected()) {
+      log("ERROR", "MQTT broker not connected. Cannot send command.");
+      return;
+    }
+    const msg = new Paho.MQTT.Message(cmd);
+    msg.destinationName = TOPIC_COMMANDS;
+    client.send(msg);
+    log("COMMAND", `Published -> "${cmd}" on ${TOPIC_COMMANDS}`);
+  }
+
+  // --- LOGGING UTILITY ---
+  function log(tag, msg) {
+    const l = document.getElementById("log");
+    const t = new Date().toLocaleTimeString();
+    const row = document.createElement("div");
+    row.className = "log-entry";
+    
+    let tagColor = "#00ff66";
+    if (tag.includes("ERROR")) tagColor = "#ff3344";
+    else if (tag.includes("AUTH")) tagColor = "#00e5ff";
+    else if (tag.includes("WARN") || tag.includes("NETWORK")) tagColor = "#ffb000";
+
+    row.innerHTML = `<span class="dim">[${t}]</span> <span style="color:${tagColor};">[${tag}]</span> ${msg}`;
+    l.appendChild(row);
+    l.scrollTop = l.scrollHeight;
+  }
+
+  function clearLogs() {
+    document.getElementById("log").innerHTML = "";
+  }
+
+  // --- OPERATIONAL MODE MANAGEMENT ---
+  function setMode(mode) {
+    currentMode = mode;
+    const btn = document.getElementById("mode-toggle-btn");
+    const deskCtrl = document.getElementById("desktop-controls");
+    const mobCtrl = document.getElementById("mobile-controls");
+    const ctrlLabel = document.getElementById("controls-label");
+
+    if (mode === "MOBILE") {
+      btn.textContent = "[ MODE: MOBILE ]";
+      deskCtrl.style.display = "none";
+      mobCtrl.style.display = "flex";
+      ctrlLabel.textContent = "Operator Controls [MOBILE BIOMETRIC MODE]";
+      log("SYS", "Operational mode set to MOBILE (Biometric WebAuthn armed)");
+    } else {
+      btn.textContent = "[ MODE: DESKTOP ]";
+      deskCtrl.style.display = "flex";
+      mobCtrl.style.display = "none";
+      ctrlLabel.textContent = "Operator Controls [DESKTOP MODE]";
+      log("SYS", "Operational mode set to DESKTOP (Manual control)");
+    }
+  }
+
+  function toggleOperationalMode() {
+    setMode(currentMode === "DESKTOP" ? "MOBILE" : "DESKTOP");
+  }
+
+  // Auto-detect mobile environment
+  function autoDetectMode() {
+    const ua = navigator.userAgent || "";
+    const isMobileUA = /android|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(ua);
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    const isNarrow = window.innerWidth <= 768;
+
+    if (isMobileUA || (isTouch && isNarrow)) {
+      setMode("MOBILE");
+    } else {
+      setMode("DESKTOP");
+    }
+  }
+
+  // --- WEBAUTHN BIOMETRIC DISARM HANDLER ---
+  async function triggerBiometricDisarm() {
+    // 1. Verify Secure Context (Required by WebAuthn)
+    if (!window.isSecureContext) {
+      log("AUTH ERROR", "Insecure Context detected! WebAuthn requires HTTPS or localhost.");
+      alert("Security Error: WebAuthn requires a Secure Context (HTTPS or localhost). Run server_https.py.");
+      return;
+    }
+
+    // 2. Verify WebAuthn API availability
+    if (!window.PublicKeyCredential) {
+      log("AUTH ERROR", "WebAuthn API is not supported on this browser.");
+      alert("WebAuthn API is not supported by your browser.");
+      return;
+    }
+
+    log("AUTH", "Requesting biometric clearance from user...");
+
+    // 3. Prepare WebAuthn Challenge Payload
+    const challenge = new Uint8Array(32);
+    window.crypto.getRandomValues(challenge);
+    const userId = new Uint8Array(16);
+    window.crypto.getRandomValues(userId);
+
+    const creationOptions = {
+      publicKey: {
+        challenge: challenge,
+        rp: {
+          name: "AegisVault Biometrics"
+        },
+        user: {
+          id: userId,
+          name: "operator@aegisvault.local",
+          displayName: "Aegis Vault Security Officer"
+        },
+        pubKeyCredParams: [
+          { alg: -7, type: "public-key" },  // ES256
+          { alg: -257, type: "public-key" } // RS256
+        ],
+        authenticatorSelection: {
+          authenticatorAttachment: "platform", // Directs to device native sensor (Fingerprint / TouchID / FaceID)
+          userVerification: "required",        // Strict biometric verification
+          residentKey: "preferred"
+        },
+        timeout: 60000,
+        attestation: "none"
+      }
+    };
+
+    try {
+      const cred = await navigator.credentials.create(creationOptions);
+      if (cred) {
+        log("AUTH", "BIOMETRIC VERIFIED: CLEARANCE GRANTED");
+        sendCommand("DISARM");
+      } else {
+        log("AUTH ERROR", "Biometric authentication aborted or failed");
+      }
+    } catch (err) {
+      const reason = err.name ? `${err.name}: ${err.message}` : err.toString();
+      log("AUTH ERROR", `Biometric authentication aborted or failed (${reason})`);
+    }
+  }
+
+  // Initialize mode on page load
+  window.addEventListener("DOMContentLoaded", () => {
+    autoDetectMode();
+  });
+</script>
+
+</body>
+</html>

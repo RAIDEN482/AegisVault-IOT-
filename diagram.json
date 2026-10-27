@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "author": "AegisVault Team",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    {
+      "type": "wokwi-photoresistor-sensor",
+      "id": "ldr",
+      "top": -150.4,
+      "left": -220,
+      "attrs": {}
+    },
+    { "type": "wokwi-pir-motion-sensor", "id": "pir", "top": -160, "left": 130, "attrs": {} },
+    { "type": "wokwi-servo", "id": "servo_door", "top": 240, "left": -240, "attrs": {} },
+    { "type": "wokwi-servo", "id": "servo_pedestal", "top": 240, "left": -60, "attrs": {} },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn_tamper",
+      "top": 240,
+      "left": 130,
+      "attrs": { "color": "red", "label": "Tamper Switch" }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "buzzer_tier1",
+      "top": -60,
+      "left": 280,
+      "attrs": { "volume": "0.1" }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "buzzer_tier2",
+      "top": 30,
+      "left": 280,
+      "attrs": { "volume": "0.1" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_alarm",
+      "top": 140,
+      "left": 280,
+      "attrs": { "color": "red", "label": "Alarm LED" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_strobe",
+      "top": 140,
+      "left": 340,
+      "attrs": { "color": "white", "label": "Strobe LED" }
+    }
+  ],
+  "connections": [
+    [ "esp:GND.1", "ldr:GND", "black", [ "v0" ] ],
+    [ "esp:3V3", "ldr:VCC", "red", [ "v0" ] ],
+    [ "ldr:AO", "esp:D34", "green", [ "v0" ] ],
+    [ "esp:GND.1", "pir:GND", "black", [ "v0" ] ],
+    [ "esp:3V3", "pir:VCC", "red", [ "v0" ] ],
+    [ "pir:OUT", "esp:D27", "gold", [ "v0" ] ],
+    [ "esp:GND.2", "servo_door:GND", "black", [ "v0" ] ],
+    [ "esp:VIN", "servo_door:V+", "red", [ "v0" ] ],
+    [ "esp:D18", "servo_door:PWM", "orange", [ "v0" ] ],
+    [ "esp:GND.2", "servo_pedestal:GND", "black", [ "v0" ] ],
+    [ "esp:VIN", "servo_pedestal:V+", "red", [ "v0" ] ],
+    [ "esp:D13", "servo_pedestal:PWM", "blue", [ "v0" ] ],
+    [ "esp:GND.2", "btn_tamper:1.l", "black", [ "v0" ] ],
+    [ "esp:D14", "btn_tamper:2.l", "purple", [ "v0" ] ],
+    [ "esp:GND.1", "buzzer_tier1:1", "black", [ "v0" ] ],
+    [ "esp:D25", "buzzer_tier1:2", "yellow", [ "v0" ] ],
+    [ "esp:GND.1", "buzzer_tier2:1", "black", [ "v0" ] ],
+    [ "esp:D26", "buzzer_tier2:2", "magenta", [ "v0" ] ],
+    [ "esp:GND.1", "led_alarm:C", "black", [ "v0" ] ],
+    [ "esp:D32", "led_alarm:A", "red", [ "v0" ] ],
+    [ "esp:GND.1", "led_strobe:C", "black", [ "v0" ] ],
+    [ "esp:D33", "led_strobe:A", "white", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}
