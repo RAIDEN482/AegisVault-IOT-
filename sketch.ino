@@ -37,7 +37,7 @@ Servo servoPedestal;
 // UPDATE THESE WITH YOUR PHONE HOTSPOT OR LAB WI-FI CREDENTIALS
 const char* WIFI_SSID     = "Your_Phone_Hotspot_Name"; 
 const char* WIFI_PASSWORD = "Your_Hotspot_Password";
-const char* MQTT_BROKER   = "://hivemq.com";
+const char* MQTT_BROKER   = "broker.hivemq.com";
 const int   MQTT_PORT     = 1883;
 
 WiFiClient espClient;
@@ -311,3 +311,43 @@ void loop() {
   switch (currentState) {
     case STATE_IDLE_ARMED: {
       if (beamCut && motionActive) {
+        enterTier1Lockdown();
+      }
+      break;
+    }
+
+    case STATE_BREACH_TIER1: {
+      if (tamperVal == LOW) {
+        enterTier2Escalation();
+      }
+      break;
+    }
+
+    case STATE_BREACH_TIER2: {
+      break;
+    }
+
+    case STATE_DISARMED: {
+      // 5-second cooldown gives you time to align your laser pointer clean on the LDR
+      if (millis() - disarmTimestamp > 5000) {
+        if (!beamCut) {
+          currentState = STATE_IDLE_ARMED;
+          Serial.println("\n[ARMED] Cooldown complete and beam clear. Vault re-armed.");
+          publishTelemetry("SYSTEM_RESTORED_ARMED");
+        } else {
+          static unsigned long lastWarn = 0;
+          if (millis() - lastWarn > 3000) {
+            lastWarn = millis();
+            Serial.println("[NOTICE] Disarmed. Please re-align laser onto the LDR to arm system.");
+          }
+        }
+      }
+      break;
+    }
+
+    case STATE_CALIBRATING:
+      break;
+  }
+
+  delay(20);
+}
